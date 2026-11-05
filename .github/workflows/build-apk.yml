@@ -39,11 +39,28 @@ jobs:
       - name: Sync Android
         run: npx cap sync android
 
-      - name: Prepare signing key
+     - name: Prepare signing key
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release-key.jks
+          python3 - <<'PY'
+          import os, base64, re, sys
+          s = os.environ.get("ANDROID_KEYSTORE_BASE64", "")
+          s = re.sub(r'\s+', '', s)
+          print("Secret length:", len(s))
+          print("Invalid characters:", len(re.sub(r'[A-Za-z0-9+/=]', '', s)))
+          try:
+              data = base64.b64decode(s, validate=True)
+              if not data:
+                  raise ValueError("Empty keystore")
+              os.makedirs("android/app", exist_ok=True)
+              with open("android/app/release-key.jks", "wb") as f:
+                  f.write(data)
+              print("Keystore decoded successfully.")
+          except Exception as e:
+              print("Keystore decode failed:", type(e).__name__, str(e))
+              sys.exit(1)
+          PY
 
       - name: Configure release signing
         working-directory: android
