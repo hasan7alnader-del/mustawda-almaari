@@ -1,4 +1,4 @@
-name: Build APK
+name: Build Signed Release APK
 
 on:
   workflow_dispatch:
@@ -39,14 +39,46 @@ jobs:
       - name: Sync Android
         run: npx cap sync android
 
-      - name: Build APK
+      - name: Prepare signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release-key.jks
+
+      - name: Configure release signing
+        working-directory: android
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cat >> app/build.gradle <<EOF
+
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file("release-key.jks")
+                      storePassword "$STORE_PASSWORD"
+                      keyAlias "$KEY_ALIAS"
+                      keyPassword "$KEY_PASSWORD"
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          EOF
+
+      - name: Build signed Release APK
         run: |
           chmod +x android/gradlew
           cd android
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
-      - name: Upload APK
+      - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: almaarri-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: almaarri-signed-release
+          path: android/app/build/outputs/apk/release/*.apk
