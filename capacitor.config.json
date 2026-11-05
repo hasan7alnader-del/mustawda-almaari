@@ -1,0 +1,7 @@
+{
+  "appId": "com.almaarri.warehouse",
+  "appName": "مستودع المعري",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "android": { "backgroundColor": "#0b0720" }
+}
