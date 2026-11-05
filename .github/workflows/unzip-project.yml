@@ -24,7 +24,7 @@ jobs:
 
       - name: Copy project files
         run: |
-          cp -a extracted/almaarri-app/. .
+          rsync -a --exclude='.github/workflows/' extracted/almaarri-app/ ./
           rm -rf extracted
 
       - name: Commit extracted files
