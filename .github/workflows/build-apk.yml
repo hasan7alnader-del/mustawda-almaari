@@ -24,85 +24,29 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - run: npm install
+      - name: Install dependencies
+        run: npm install
 
-      - run: cp node_modules/@supabase/supabase-js/dist/umd/supabase.js www/supabase.js
+      - name: Prepare Supabase
+        run: cp node_modules/@supabase/supabase-js/dist/umd/supabase.js www/supabase.js
 
-      - run: npx cap add android
+      - name: Add Android
+        run: npx cap add android
 
-      - run: npx capacitor-assets generate --android
+      - name: Generate app assets
+        run: npx capacitor-assets generate --android
 
-      - run: npx cap sync android
+      - name: Sync Android
+        run: npx cap sync android
 
-      - name: Configure Android signing
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          test -n "$ANDROID_KEYSTORE_BASE64"
-          test -n "$ANDROID_KEYSTORE_PASSWORD"
-          test -n "$ANDROID_KEY_ALIAS"
-          test -n "$ANDROID_KEY_PASSWORD"
-
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/maari-release-key.jks"
-
-          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/maari-release-key.jks" >> "$GITHUB_ENV"
-          echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
-          echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
-
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          p = Path("android/app/build.gradle")
-          s = p.read_text()
-
-          signing = """
-              signingConfigs {
-                  release {
-                      storeFile file(System.getenv("ANDROID_KEYSTORE_FILE"))
-                      storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
-                      keyAlias System.getenv("ANDROID_KEY_ALIAS")
-                      keyPassword System.getenv("ANDROID_KEY_PASSWORD")
-                  }
-              }
-
-          """
-
-          if "signingConfigs {" not in s:
-              s = s.replace("    buildTypes {", signing + "    buildTypes {", 1)
-
-          if "signingConfig signingConfigs.release" not in s:
-              s, n = re.subn(
-                  r"(buildTypes\s*\{\s*release\s*\{)",
-                  r"\1\n            signingConfig signingConfigs.release",
-                  s,
-                  count=1
-              )
-              if n != 1:
-                  raise SystemExit("Could not configure release signing")
-
-          p.write_text(s)
-          PY
-
-      - name: Increase Gradle timeout
-        run: |
-          mkdir -p ~/.gradle
-          echo "systemProp.org.gradle.internal.http.connectionTimeout=600000" >> ~/.gradle/gradle.properties
-          echo "systemProp.org.gradle.internal.http.socketTimeout=600000" >> ~/.gradle/gradle.properties
-
-      - name: Build APKs
+      - name: Build APK
         run: |
           chmod +x android/gradlew
           cd android
-          ./gradlew assembleDebug assembleRelease --no-daemon
+          ./gradlew assembleDebug --no-daemon
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          name: almaarri-apks
-          path: |
-            android/app/build/outputs/apk/debug/app-debug.apk
-            android/app/build/outputs/apk/release/app-release.apk
+          name: almaarri-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
